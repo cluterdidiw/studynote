@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 setup.cfg
 mytools/__init__.py
+mytools/dataeda.py
 mytools/math_utils.py
 mytools/string_utils.py
 mytools.egg-info/PKG-INFO
