@@ -1,0 +1,5 @@
+[build-system]
+# 声明打包所需的工具（setuptools + wheel）
+requires = ["setuptools>=61.0", "wheel"]
+# 指定打包后端（使用 setuptools 处理打包逻辑）
+build-backend = "setuptools.build_meta"

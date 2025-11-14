@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+setup.cfg
+mytools/__init__.py
+mytools/math_utils.py
+mytools/string_utils.py
+mytools.egg-info/PKG-INFO
+mytools.egg-info/SOURCES.txt
+mytools.egg-info/dependency_links.txt
+mytools.egg-info/top_level.txt

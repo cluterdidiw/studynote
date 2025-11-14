@@ -28,6 +28,5 @@
     如何安装
 ```pip install wooldridge```
 或
-```git clone https://github.com/spring-haru/wooldridge.git
-pip install``` .
+```git clone https://github.com/spring-haru/wooldridge.git pip install``` .
 参考J.M.Wooldridge（2016）计量经济学导论：现代方法，Cengage Learning，第6版。
