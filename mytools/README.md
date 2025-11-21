@@ -4,7 +4,7 @@ mytools中存放常用的函数或者类
 ## pyhive.py
 
 ```
-from mytools import pyhive
+from mytools import mpyhive
 ```
 ### hive_exe
 用于到hive里执行DDL语句。
