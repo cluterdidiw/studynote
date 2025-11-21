@@ -1,38 +1,66 @@
 import pandas as pd
+import numpy as np
 
-def calculate_unique_pivot(df, index_col, columns_col, values_col, pct_base='total'):
-    # 校验百分比基准参数
+def my_unique_pivot(df, index_col=None, columns_col=None, values_col=None, pct_base='total'):
+    """
+    计算指定DataFrame中行列交叉的非重复值数量及百分比
+
+    参数:
+        df (pd.DataFrame): 输入的DataFrame
+        index_col (str or list): 作为行索引的列名（可选，支持多列）
+        columns_col (str or list): 作为列索引的列名（可选，支持多列）
+        values_col (str): 需要计算非重复数量的列名（必填）
+        pct_base (str): 百分比计算基准，可选值：
+            - 'total'：除以整体唯一值数量（默认）
+            - 'row'：除以行总计
+            - 'col'：除以列总计
+
+    返回:
+        tuple: (count_pivot, pct_pivot)
+            - count_pivot: 非重复计数值（含总计）
+            - pct_pivot: 对应百分比（保留两位小数）
+    """
+    if values_col is None:
+        raise ValueError("必须指定 values_col 参数")
     if pct_base not in ['total', 'row', 'col']:
         raise ValueError("pct_base参数必须为'total'、'row'或'col'")
 
-    # 计算交叉非重复值数量（包含总计）
+    # 如果 index 和 columns 都为空，直接返回整体唯一值
+    if not index_col and not columns_col:
+        total_unique = df[values_col].nunique()
+        count_pivot = pd.DataFrame({'Total': [total_unique]}, index=['Total'])
+        pct_pivot = pd.DataFrame({'Total': [100.0]}, index=['Total'])
+        return count_pivot, pct_pivot
+
+    # 构建 pivot_table
     count_pivot = df.pivot_table(
-        index=index_col,
-        columns=columns_col,
+        index=index_col if index_col else None,
+        columns=columns_col if columns_col else None,
         values=values_col,
-        aggfunc=lambda x: x.nunique(),  # 计算非重复值数量
+        aggfunc=lambda x: x.nunique(),
         fill_value=0,
-        margins=True,                   # 开启总计
-        margins_name='总计'              # 自定义总计名称
+        margins=True,
+        margins_name='Total'
     )
 
-    # 计算百分比
+    # 扁平化多级索引（如果存在）
+    if isinstance(count_pivot.columns, pd.MultiIndex):
+        count_pivot.columns = ['_'.join(map(str, col)) for col in count_pivot.columns]
+    if isinstance(count_pivot.index, pd.MultiIndex):
+        count_pivot.index = ['_'.join(map(str, idx)) for idx in count_pivot.index]
+
+    # 百分比计算逻辑
     if pct_base == 'total':
-        # 除以总体总计（即"总计"行和"总计"列的交叉值）
-        total = count_pivot.loc['总计', '总计']
-        pct_pivot = count_pivot.div(total) * 100
-
+        total_unique = df[values_col].nunique()
+        pct_pivot = count_pivot.div(total_unique) * 100
     elif pct_base == 'row':
-        # 除以行总计（每行的"总计"列值）
-        row_totals = count_pivot['总计']
+        row_totals = count_pivot['Total'] if 'Total' in count_pivot.columns else count_pivot.sum(axis=1)
         pct_pivot = count_pivot.div(row_totals, axis=0) * 100
-
     else:  # pct_base == 'col'
-        # 除以列总计（每列的"总计"行值）
-        col_totals = count_pivot.loc['总计']
+        col_totals = count_pivot.loc['Total'] if 'Total' in count_pivot.index else count_pivot.sum(axis=0)
         pct_pivot = count_pivot.div(col_totals, axis=1) * 100
 
-    # 保留两位小数并处理可能的NaN（当除数为0时）
     pct_pivot = pct_pivot.round(2).fillna(0)
 
     return count_pivot, pct_pivot
+

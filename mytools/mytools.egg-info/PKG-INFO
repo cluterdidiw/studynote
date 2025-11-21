@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: mytools
-Version: 0.1.2
+Version: 0.1.12
 Summary: 常用自定义工具函数包
 Author: didiw
 Author-email: diffmaper@163.com
@@ -9,6 +9,47 @@ Description-Content-Type: text/markdown
 # 说明
 
 mytools中存放常用的函数或者类
+## pyhive.py
+
+```
+from mytools import pyhive
+```
+### hive_exe
+用于到hive里执行DDL语句。
+
+参数:
+- db: str = 'temp', 
+- host: str = '192.168.101.195', 
+- port: int = 10000
+其中，db host port三个参数是北极星的服务器。
+
+# 示例
+
+``` python
+exe_res = hive_exe("CREATE TABLE IF NOT EXISTS temp_test_wh_py  as select * from ads.ads_slot_show_click_statistics limit 1000")
+
+```
+
+### hive_get
+用于到hive里执行查询语句，并将获取数据返回Dataframe。
+
+参数:
+- db: str = 'temp', 
+- host: str = '192.168.101.195', 
+- port: int = 10000
+其中，db host port三个参数是北极星的服务器。
+
+
+
+
+``` python
+
+# 示例
+df = hive_get("SELECT * FROM temp_tbname LIMIT 10")
+
+```
+
+
 
 ## dataeda.py
 
