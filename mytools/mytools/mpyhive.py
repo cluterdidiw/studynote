@@ -2,7 +2,7 @@ from pyhive import hive
 import time
 import pandas as pd
 
-def hive_exe(db: str, sql: str, host: str = '192.168.101.195', port: int = 10000) -> dict:
+def hive_exe(sql: str,db: str = 'temp', host: str = '192.168.101.195', port: int = 10000) -> dict:
     """
     执行Hive DDL命令，返回执行结果
     
