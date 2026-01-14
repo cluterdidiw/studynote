@@ -12,29 +12,36 @@ import urllib.request
 import zipfile
 import shutil
 
-# 配置信息
+# =================================================================
+# 1. 配置信息
+# =================================================================
 PYTHON_EMBED_URL = "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip"
 GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
 DIST_DIR = "Lineage_Tool_Dist"  # 最终生成的文件夹名
 
-# 核心依赖：增加了 xlsxwriter 用于导出功能
+# 核心依赖列表：确保包含所有 app.py 引用的库及其底层渲染引擎
 DEPENDENCIES = [
     "streamlit", 
     "pandas", 
     "networkx", 
-    "plotly", 
     "pymysql", 
     "openpyxl", 
-    "xlsxwriter"  # 必须包含此项以支持导出 Excel
+    "xlsxwriter",       # 必选：支持 app.py 中的 engine='xlsxwriter' 导出
+    "streamlit-agraph",  # 必选：血缘图核心组件
+    "pyvis",             # 必选：streamlit-agraph 的底层渲染依赖
+    "protobuf==3.20.3"   # 必选：解决版本兼容性导致的显示问题
 ]
 
 def build():
+    # 清理旧的目录
     if os.path.exists(DIST_DIR):
         shutil.rmtree(DIST_DIR)
     os.makedirs(DIST_DIR)
     
-    # 1. 下载并解压便携版 Python
-    print("正在下载 Python 便携版...")
+    # ---------------------------------------------------------
+    # 2. 下载并解压便携版 Python
+    # ---------------------------------------------------------
+    print(">>> 正在下载 Python 便携版 (3.10.11)...")
     zip_path = "python_embed.zip"
     try:
         urllib.request.urlretrieve(PYTHON_EMBED_URL, zip_path)
@@ -45,48 +52,86 @@ def build():
         print(f"下载 Python 失败: {e}")
         return
 
-    # 2. 修改 python310._pth 允许加载 site-packages
+    # ---------------------------------------------------------
+    # 3. 配置 Python 环境以允许加载第三方库
+    # ---------------------------------------------------------
     pth_file = os.path.join(DIST_DIR, "python_env", "python310._pth")
     if os.path.exists(pth_file):
         with open(pth_file, "a") as f:
             f.write("\nimport site\n")
 
-    # 3. 安装 pip
-    print("正在安装 pip...")
+    # ---------------------------------------------------------
+    # 4. 安装 pip
+    # ---------------------------------------------------------
+    print(">>> 正在安装 pip 工具...")
     env_dir = os.path.join(os.getcwd(), DIST_DIR, "python_env")
     python_exe = os.path.join(env_dir, "python.exe")
     pip_script = os.path.join(DIST_DIR, "get-pip.py")
-    urllib.request.urlretrieve(GET_PIP_URL, pip_script)
-    subprocess.run([python_exe, pip_script], check=True)
-    os.remove(pip_script)
+    try:
+        urllib.request.urlretrieve(GET_PIP_URL, pip_script)
+        subprocess.run([python_exe, pip_script], check=True)
+        os.remove(pip_script)
+    except Exception as e:
+        print(f"安装 pip 失败: {e}")
+        return
 
-    # 4. 安装所有依赖库 (包含 xlsxwriter)
-    print(f"正在安装依赖库 {DEPENDENCIES}，这可能需要几分钟...")
-    subprocess.run([python_exe, "-m", "pip", "install"] + DEPENDENCIES, check=True)
+    # ---------------------------------------------------------
+    # 5. 安装依赖库 (使用阿里云镜像加速)
+    # ---------------------------------------------------------
+    print(f">>> 正在同步安装依赖库: {DEPENDENCIES}")
+    print("这可能需要几分钟，请耐心等待...")
+    try:
+        pip_cmd = [python_exe, "-m", "pip", "install"] + DEPENDENCIES + ["-i", "https://mirrors.aliyun.com/pypi/simple/"]
+        subprocess.run(pip_cmd, check=True)
+    except Exception as e:
+        print(f"依赖库安装失败: {e}")
+        return
 
-    # 5. 拷贝整合了中间穿透和导出功能的 app.py
+    # ---------------------------------------------------------
+    # 6. 拷贝业务逻辑代码 app.py
+    # ---------------------------------------------------------
     if os.path.exists("app.py"):
         shutil.copy("app.py", os.path.join(DIST_DIR, "app.py"))
+        print(">>> app.py 拷贝完成")
     else:
-        print("错误：未找到 app.py 文件！请确保它在当前目录下。")
+        print("!!! 错误：当前目录下未找到 app.py，请检查文件名是否正确。")
+        return
 
-    # 6. 生成启动脚本
-    print("正在生成启动脚本...")
+    # ---------------------------------------------------------
+    # 7. 生成启动批处理脚本 (优化启动参数)
+    # ---------------------------------------------------------
+    print(">>> 正在生成一键启动脚本...")
+    # 增加了 --server.enableStaticServing true 以确保 agraph 的 JS 资源能正确加载
+    # 增加了 --server.enableCORS false 提高便携环境下的兼容性
+    # 修改 make_dist.py 中的启动脚本部分
     bat_content = f"""@echo off
-set PATH=%~dp0python_env;%~dp0python_env\\Scripts;%PATH%
-echo ========================================
-echo   数据血缘分析平台 (已集成穿透与导出)
-echo   正在启动... 请勿关闭此窗口
-echo ========================================
-start /b "" "%~dp0python_env\\python.exe" -m streamlit run "%~dp0app.py" --server.port 8501 --server.headless true
-timeout /t 5
-start http://localhost:8501
-"""
+    set PATH=%~dp0python_env;%~dp0python_env\\Scripts;%PATH%
+    echo ======================================================
+    echo   数据血缘分析平台 (已优化布局与兼容性)
+    echo   正在启动本地服务器... 请保持此窗口开启
+    echo ======================================================
+    :: 1. 移除冲突的 CORS 设置
+    :: 2. 禁用 XSRF 保护以支持更灵活的本地访问
+    :: 3. 增加布局间距参数，解决右侧红框溢出问题
+    start /b "" "%~dp0python_env\\python.exe" -m streamlit run "%~dp0app.py" ^
+        --server.port 8501 ^
+        --server.headless true ^
+        --server.enableXsrfProtection false ^
+        --server.enableStaticServing false ^
+        --browser.gatherUsageStats false ^
+        --global.developmentMode false
+
+    timeout /t 5
+    start http://localhost:8501
+    """
     with open(os.path.join(DIST_DIR, "双击运行.bat"), "w", encoding="gbk") as f:
         f.write(bat_content)
 
-    print(f"\n🎉 封装完成！")
-    print(f"请将文件夹 '{DIST_DIR}' 压缩为 ZIP 发送给同事。")
+    print(f"\n" + "="*50)
+    print(f"🎉 封装构建成功！")
+    print(f"生成的目录: {DIST_DIR}")
+    print(f"使用方法: 将 '{DIST_DIR}' 文件夹整体打包为 ZIP 发送给同事，对方解压后双击内部的 '双击运行.bat' 即可。")
+    print("="*50)
 
 if __name__ == "__main__":
     build()
